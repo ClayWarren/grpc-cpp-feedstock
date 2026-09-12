@@ -84,7 +84,7 @@ source:
   {% endif %}
 
 build:
-  number: 0
+  number: 1
 
 outputs:
   - name: libgrpc
@@ -120,7 +120,7 @@ outputs:
         - openssl
         - zlib
       run:
-        - ucrt  # [win]
+        - ucrt  # [win and not arm64]
       run_constrained:
         # make sure we don't co-install with old version of previous package name
         - grpc-cpp ={{ version }}
@@ -137,6 +137,7 @@ outputs:
         - zlib
       files:
         - cmake_test/
+        - consumer/  # [win and arm64]
         - hello.proto
         - test_grpc.sh
         - test_grpc.bat
@@ -182,6 +183,13 @@ outputs:
         - if exist %LIBRARY_LIB%\grpc_unsecure.lib exit 1       # [win]
         - if exist %LIBRARY_LIB%\grpc++_unsecure.lib exit 1     # [win]
 
+        - cmake -S consumer -B consumer-build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="%LIBRARY_PREFIX%"  # [win and arm64]
+        - cmake --build consumer-build  # [win and arm64]
+        - consumer-build\grpc_consumer.exe  # [win and arm64]
+        - dumpbin /headers consumer-build\grpc_consumer.exe | findstr /I /C:"AA64 machine (ARM64)"  # [win and arm64]
+        - dumpbin /headers "%LIBRARY_BIN%\grpc.dll" | findstr /I /C:"AA64 machine (ARM64)"  # [win and arm64]
+        - dumpbin /headers "%LIBRARY_BIN%\grpc_cpp_plugin.exe" | findstr /I /C:"AA64 machine (ARM64)"  # [win and arm64]
+
         # CMake test: compile upstream example
         - ./test_grpc.sh   # [unix]
         - ./test_grpc.bat  # [win]
@@ -222,6 +230,7 @@ outputs:
         - examples/protos/helloworld.proto
       files:
         - grpcio_distribtest.py
+        - check_arm64.py  # [win and arm64]
         - test_grpcio_helloworld.py
       requires:
         - pip
@@ -240,6 +249,7 @@ outputs:
       commands:
         - python -m pip check
         - python grpcio_distribtest.py
+        - python check_arm64.py grpc._cython._cygrpc  # [win and arm64]
         {% if build_platform == target_platform %}
         # test actual RPC pattern (client & server); other tests did not catch
         # https://github.com/conda-forge/grpc-cpp-feedstock/issues/281
@@ -282,10 +292,13 @@ outputs:
     test:
       requires:
         - pip
+      files:
+        - check_arm64.py  # [win and arm64]
       imports:
         - grpc_tools
       commands:
         - pip check
+        - python check_arm64.py grpc_tools._protoc_compiler  # [win and arm64]
         # see https://github.com/conda-forge/grpc-cpp-feedstock/issues/385
         - test "$(python -m grpc_tools.protoc --version)" == "$(protoc --version)"  # [unix]
 
