@@ -1,0 +1,4 @@
+syntax = "proto3";
+package arm64test;
+message Payload { string text = 1; }
+service Echo { rpc Call(Payload) returns (Payload); }
