@@ -249,7 +249,7 @@ outputs:
       commands:
         - python -m pip check
         - python grpcio_distribtest.py
-        - python check_arm64.py grpc._cython._cygrpc  # [win and arm64]
+        - python check_arm64.py grpc._cython.cygrpc  # [win and arm64]
         {% if build_platform == target_platform %}
         # test actual RPC pattern (client & server); other tests did not catch
         # https://github.com/conda-forge/grpc-cpp-feedstock/issues/281
