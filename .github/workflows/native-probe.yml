@@ -1,0 +1,74 @@
+name: grpc native Windows ARM64
+on:
+  push:
+    branches: [codex/grpc-pinned-arm64-probe]
+permissions:
+  contents: read
+jobs:
+  probe:
+    if: github.repository == 'ClayWarren/grpc-cpp-feedstock'
+    runs-on: windows-11-arm
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [win_arm64_]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Retrieve verified native Protobuf and RE2 prerequisites
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Path C:/grpc-prereqs/win-arm64 -Force | Out-Null
+          gh run download 34691706343 --repo ClayWarren/libprotobuf-feedstock --name libprotobuf-arm64-package --dir "$env:RUNNER_TEMP/libprotobuf"
+          if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed' }
+          $pkg = @(Get-ChildItem "$env:RUNNER_TEMP/libprotobuf" -Recurse -Filter 'libprotobuf-python-headers-7.35.1-h50cf7a0_4.conda')
+          if ($pkg.Count -ne 1) { throw 'Expected one exact prerequisite' }
+          if ((Get-FileHash $pkg[0].FullName -Algorithm SHA256).Hash.ToLower() -ne 'd33605a90fdefeeb8d5a97f4dd19de8c77e6960503af2bb222738317edf61cfc') { throw 'Prerequisite checksum mismatch' }
+          Copy-Item $pkg[0].FullName C:/grpc-prereqs/win-arm64/
+          $pkg = @(Get-ChildItem "$env:RUNNER_TEMP/libprotobuf" -Recurse -Filter 'libprotobuf-7.35.1-hd8bd404_4.conda')
+          if ($pkg.Count -ne 1) { throw 'Expected one exact prerequisite' }
+          if ((Get-FileHash $pkg[0].FullName -Algorithm SHA256).Hash.ToLower() -ne '9b3c146bc75d433525dde0c0d2f5dd8f7386a99e74d81b43db79377ae0e8b2f3') { throw 'Prerequisite checksum mismatch' }
+          Copy-Item $pkg[0].FullName C:/grpc-prereqs/win-arm64/
+          $pkg = @(Get-ChildItem "$env:RUNNER_TEMP/libprotobuf" -Recurse -Filter 'libprotobuf-static-7.35.1-hd8bd404_4.conda')
+          if ($pkg.Count -ne 1) { throw 'Expected one exact prerequisite' }
+          if ((Get-FileHash $pkg[0].FullName -Algorithm SHA256).Hash.ToLower() -ne '6df5ea51e347ef90abdaa4d592052815da46b17e1e45be49ac780919adced390') { throw 'Prerequisite checksum mismatch' }
+          Copy-Item $pkg[0].FullName C:/grpc-prereqs/win-arm64/
+          gh run download 34692513936 --repo ClayWarren/re2-feedstock --name re2-arm64-package --dir "$env:RUNNER_TEMP/re2"
+          if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed' }
+          $pkg = @(Get-ChildItem "$env:RUNNER_TEMP/re2" -Recurse -Filter 're2-2025.11.05-hae12b6c_3.conda')
+          if ($pkg.Count -ne 1) { throw 'Expected one exact prerequisite' }
+          if ((Get-FileHash $pkg[0].FullName -Algorithm SHA256).Hash.ToLower() -ne '93a2daca44cad63e08869b8685e173636fa43c246ef6edda779e531a13f233a5') { throw 'Prerequisite checksum mismatch' }
+          Copy-Item $pkg[0].FullName C:/grpc-prereqs/win-arm64/
+          $pkg = @(Get-ChildItem "$env:RUNNER_TEMP/re2" -Recurse -Filter 'libre2-11-2025.11.05-hc17862f_3.conda')
+          if ($pkg.Count -ne 1) { throw 'Expected one exact prerequisite' }
+          if ((Get-FileHash $pkg[0].FullName -Algorithm SHA256).Hash.ToLower() -ne '6903ee3b5e0aabda96e37ed0f6c7b1569ecc780d5305524bd449e24705434d16') { throw 'Prerequisite checksum mismatch' }
+          Copy-Item $pkg[0].FullName C:/grpc-prereqs/win-arm64/
+      - name: Build and test grpc
+        shell: cmd
+        env:
+          BUILD_PLATFORM: win-arm64
+          CI: github_actions
+          CONDA_BLD_PATH: C:\bld
+          CONFIG: ${{ matrix.config }}
+          MINIFORGE_HOME: C:\Miniforge
+          PYTHONUNBUFFERED: '1'
+          UPLOAD_PACKAGES: 'False'
+          CONDA_CHANNEL_PRIORITY: strict
+          EXTRA_CB_OPTIONS: '--override-channels -c file:///C:/grpc-prereqs -c conda-forge'
+          RATTLER_BUILD_COLOR: always
+          RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: 'true'
+        run: |
+          set "flow_run_id=github_%GITHUB_RUN_ID%"
+          set "remote_url=https://github.com/%GITHUB_REPOSITORY%"
+          set "sha=%GITHUB_SHA%"
+          call ".scripts\run_win_build.bat"
+      - name: Preserve grpc package
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: grpc-arm64-package
+          path: C:\bld\win-arm64\*.conda
+          if-no-files-found: warn
+          retention-days: 7
